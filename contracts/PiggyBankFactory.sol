@@ -4,19 +4,67 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./PiggyBank.sol";
 
+interface IERC20Metadata is IERC20 {
+    function name() external view returns (string memory);
+    function symbol() external view returns (string memory);
+    function decimals() external view returns (uint8);
+}
+
 contract PiggyBankFactory {
 
-     event PiggyBankCreated(address indexed piggyBankAddress, string purpose, address token);
+    event PiggyBankCreated(address indexed piggyBankAddress, string purpose, address token);
 
+    function isValidToken(address _token) internal view returns (bool) {
+        try IERC20Metadata(_token).symbol() returns (string memory symbol) {
+            if (
+                keccak256(bytes(symbol)) == keccak256("USDT") ||
+                keccak256(bytes(symbol)) == keccak256("USDC") ||
+                keccak256(bytes(symbol)) == keccak256("DAI")
+            ) {
+                return true;
+            }
+        } catch {
+            // If symbol() fails, the token is invalid
+        }
+        return false;
+    }
 
-    function getbytecode(
+    function createPiggyBank(
         string memory _purpose,
         uint256 _duration,
-        address _token // Only one token address is passed
+        address _token
+    ) public {
+        require(_token != address(0), "Token address cannot be zero");
+
+        // Validate that the token is one of the supported tokens
+        require(isValidToken(_token), "Unsupported token");
+
+        // Generate bytecode for the PiggyBank contract
+        bytes memory bytecode = abi.encodePacked(
+            type(PiggyBank).creationCode,
+            abi.encode(msg.sender, _purpose, _duration, _token)
+        );
+
+        // Calculate the deterministic address
+        uint256 salt = uint256(keccak256(abi.encodePacked(_purpose, msg.sender, block.timestamp)));
+        address calculatedAddress = getAddress(bytecode, salt);
+
+        // Deploy the PiggyBank contract
+        Deploy(bytecode, salt);
+
+        // Emit an event with the created piggy bank's details
+        emit PiggyBankCreated(calculatedAddress, _purpose, _token);
+    }
+
+    function getbytecode(
+        address _owner,
+        string memory _purpose,
+        uint256 _duration,
+        address _token
     ) public pure returns (bytes memory) {
         return abi.encodePacked(
             type(PiggyBank).creationCode,
-            abi.encode(_purpose, _duration, _token)
+            abi.encode(_owner, _purpose, _duration, _token)
         );
     }
 
@@ -29,8 +77,6 @@ contract PiggyBankFactory {
                 keccak256(bytecode)
             )
         );
-
-        // Cast the last 20 bytes of the hash to an address
         return address(uint160(uint256(hash)));
     }
 
@@ -47,47 +93,5 @@ contract PiggyBankFactory {
                 revert(0, 0)
             }
         }
-
     }
-
-   function isValidToken(address _token) internal view returns (bool) {
-    try IERC20(_token).symbol() returns (string memory symbol) {
-        // Check if the token symbol matches USDT, USDC, or DAI
-        if (
-            keccak256(bytes(symbol)) == keccak256("USDT") ||
-            keccak256(bytes(symbol)) == keccak256("USDC") ||
-            keccak256(bytes(symbol)) == keccak256("DAI")
-        ) {
-            return true;
-        }
-    } catch {
-        // If symbol() fails, the token is invalid
-        return false;
-    }
-    
-}
-
-function createPiggyBank(
-    string memory _purpose,
-    uint256 _duration,
-    address _token // Token address passed by the user
-) public {
-    require(_token != address(0), "Token address cannot be zero");
-
-    // Validate that the token is a valid ERC20 and one of the supported tokens
-    require(isValidToken(_token), "Unsupported token");
-
-    // Generate bytecode for the PiggyBank contract
-    bytes memory bytecode = getbytecode(_purpose, _duration, _token);
-
-    // Calculate the deterministic address
-    uint256 salt = uint256(keccak256(abi.encodePacked(_purpose, msg.sender, block.timestamp)));
-    address calculatedAddress = getAddress(bytecode, salt);
-
-    // Deploy the PiggyBank contract
-    Deploy(bytecode, salt);
-
-    // Emit an event with the created piggy bank's details
-    emit PiggyBankCreated(calculatedAddress, _purpose, _token);
-}
 }

@@ -6,4 +6,3 @@ export default buildModule("PiggyBankFactoryModule", (m) => {
 
   return { piggyBankFactory };
 });
-
