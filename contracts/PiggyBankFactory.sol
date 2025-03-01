@@ -13,6 +13,44 @@ interface IERC20Metadata is IERC20 {
 contract PiggyBankFactory {
 
     event PiggyBankCreated(address indexed piggyBankAddress, string purpose, address token);
+     function getbytecode(
+        address _owner,
+        string memory _purpose,
+        uint256 _duration,
+        address _token
+    ) public pure returns (bytes memory) {
+        return abi.encodePacked(
+            type(PiggyBank).creationCode,
+            abi.encode(_owner, _purpose, _duration, _token)
+        );
+    }
+
+    function getAddress(bytes memory bytecode, uint256 _salt) public view returns (address) {
+        bytes32 hash = keccak256(
+            abi.encodePacked(
+                bytes1(0xff),
+                address(this),
+                _salt,
+                keccak256(bytecode)
+            )
+        );
+        return address(uint160(uint256(hash)));
+    }
+
+    function Deploy(bytes memory bytecode, uint256 _salt) public {
+        address addr;
+        assembly {
+            addr := create2(
+                0, // No value sent
+                add(bytecode, 0x20), // Start of the bytecode
+                mload(bytecode), // Length of the bytecode
+                _salt // Salt value for CREATE2
+            )
+            if iszero(extcodesize(addr)) {
+                revert(0, 0)
+            }
+        }
+    }
 
     function isValidToken(address _token) internal view returns (bool) {
         try IERC20Metadata(_token).symbol() returns (string memory symbol) {
@@ -57,42 +95,5 @@ contract PiggyBankFactory {
         emit PiggyBankCreated(calculatedAddress, _purpose, _token);
     }
 
-    function getbytecode(
-        address _owner,
-        string memory _purpose,
-        uint256 _duration,
-        address _token
-    ) public pure returns (bytes memory) {
-        return abi.encodePacked(
-            type(PiggyBank).creationCode,
-            abi.encode(_owner, _purpose, _duration, _token)
-        );
-    }
-
-    function getAddress(bytes memory bytecode, uint256 _salt) public view returns (address) {
-        bytes32 hash = keccak256(
-            abi.encodePacked(
-                bytes1(0xff),
-                address(this),
-                _salt,
-                keccak256(bytecode)
-            )
-        );
-        return address(uint160(uint256(hash)));
-    }
-
-    function Deploy(bytes memory bytecode, uint256 _salt) public {
-        address addr;
-        assembly {
-            addr := create2(
-                0, // No value sent
-                add(bytecode, 0x20), // Start of the bytecode
-                mload(bytecode), // Length of the bytecode
-                _salt // Salt value for CREATE2
-            )
-            if iszero(extcodesize(addr)) {
-                revert(0, 0)
-            }
-        }
-    }
+   
 }
