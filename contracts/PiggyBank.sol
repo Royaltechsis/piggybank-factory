@@ -39,7 +39,7 @@ contract PiggyBank {
         _;
     }
 
-    function deposit(uint256 amount,  ) public onlyOwner notTerminated {
+    function deposit(uint256 amount  ) public onlyOwner notTerminated {
         require(amount > 0, "Deposit amount must be greater than 0");
 
 
