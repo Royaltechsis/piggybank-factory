@@ -25,8 +25,9 @@ contract PiggyBankFactory {
             }
         } catch {
             // If symbol() fails, the token is invalid
+            return false;
         }
-        return false;
+    
     }
 
     function createPiggyBank(
